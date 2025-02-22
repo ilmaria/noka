@@ -18,9 +18,9 @@ pub const Value = extern union {
 pub const Attribute = FieldEnum(Value, u8);
 
 pub const Layout = enum(u8) {
-    vertical_stack,
-    horizontal_stack,
-    grid,
+    vertical_stack = 4,
+    horizontal_stack = 5,
+    grid = 6,
 };
 
 pub const Flags = packed struct(u8) {
@@ -52,16 +52,16 @@ pub const Rectangle = extern struct {
 
 pub const Point = extern struct {
     anchor: enum(u8) {
-        top_left,
-        top_right,
-        bottom_left,
-        bottom_right,
+        top_left = 7,
+        top_right = 8,
+        bottom_left = 9,
+        bottom_right = 10,
     },
     units: enum(u8) {
-        all_pixel,
-        all_percentage,
-        x_pixel_and_y_percentage,
-        x_percentage_and_y_pixel,
+        all_pixel = 11,
+        all_percentage = 12,
+        x_pixel_and_y_percentage = 13,
+        x_percentage_and_y_pixel = 14,
     },
     x: f64,
     y: f64,
