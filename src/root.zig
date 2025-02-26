@@ -1,19 +1,25 @@
-pub const Element = enum(u64) {
+pub const Entity = enum(u64) {
     root = std.math.maxInt(u64),
     _,
 };
 
 pub const Value = extern union {
-    parent: Element,
+    parent: Entity,
     index: u64,
     layout: Layout,
     flags: Flags,
-    corner_radius: f32,
+    corner_radius_px: f32,
     color: Color,
     enabled_if: void, // TODO
-    triangle_strip: TriangleStrip.Length,
+    triangle_strip: Length,
     rectangle: Rectangle,
+    text: Length,
+    text_type: TextType,
+    font_family: void, // TODO
+    font_size: void, // TODO
 };
+
+pub const Length = u32;
 
 pub const Attribute = FieldEnum(Value, u8);
 
@@ -42,7 +48,6 @@ pub const TriangleStrip = struct {
         color: Color,
     };
     pub const Index = enum(u32) { _ };
-    pub const Length = enum(u32) { _ };
 };
 
 pub const Rectangle = extern struct {
@@ -67,15 +72,11 @@ pub const Point = extern struct {
     y: f64,
 };
 
-// pub const Distance = extern struct {
-//     tag: FieldEnum(@This().Value, u8),
-//     value: @This().Value,
-
-//     pub const Value = extern union {
-//         percentage: f64,
-//         pixels: f64,
-//     };
-// };
+pub const TextType = enum(u8) {
+    body = 15,
+    title = 16,
+    sub_title = 17,
+};
 
 pub fn FieldEnum(comptime T: type, tag_type: type) type {
     const fields = @typeInfo(T).@"union".fields;
