@@ -9,6 +9,8 @@ pub const Value = extern union {
     layout: Layout,
     flags: Flags,
     corner_radius_px: f32,
+    boder_width: f32,
+    border_color: Color,
     color: Color,
     enabled_if: void, // TODO
     triangle_strip: Length,

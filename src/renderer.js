@@ -9,6 +9,8 @@
  * @property {Layout} [layout]
  * @property {Flags} [flags]
  * @property {number} [cornerRadius]
+ * @property {number} [borderWidth]
+ * @property {Color} [borderColor]
  * @property {Color} [color]
  * @property {void} [enabledIf]
  * @property {Length} [triangleStrip]
@@ -23,6 +25,9 @@
  * @typedef EntityId
  * @type {number}
  */
+
+// maxInt(u32)
+const ROOT_ENTITY_ID = 4294967295;
 
 /**
  * @typedef Length
@@ -57,8 +62,8 @@ const LAYOUT_GRID = 6;
 /**
  * @typedef Rectangle
  * @type {object}
- * @property {Point} min
- * @property {Point} max
+ * @property {Point} start
+ * @property {Point} end
  */
 
 /**
@@ -94,10 +99,85 @@ const TEXT_TYPE_BODY = 15;
 const TEXT_TYPE_TITLE = 16;
 const TEXT_TYPE_SUB_TITLE = 17;
 
+/**
+ * @typedef {object} WindowExtraFields
+ * @property {boolean} [NOKA_DEBUG]
+ */
+
+/**
+ * @typedef {Window & WindowExtraFields} CustomWindow
+ */
+
+/** @type {CustomWindow} */(window).NOKA_DEBUG = true;
+
+/** @type {Entity[]} */
+const entities = [
+  { id: 1, parent: ROOT_ENTITY_ID, layout: LAYOUT_HORIZONTAL_STACK, index: 0 },
+  {
+    id: 2, parent: 1, rectangle: {
+      start: { anchor: ANCHOR_TOP_LEFT, units: UNITS_ALL_PIXEL, x: 0, y: 0 },
+      end: { anchor: ANCHOR_TOP_LEFT, units: UNITS_ALL_PIXEL, x: 100, y: 100 }
+    },
+    color: { r: 255, g: 0.0, b: 10, a: 1.0 },
+    index: 0,
+  },
+  {
+    id: 3, parent: 1, rectangle: {
+      start: { anchor: ANCHOR_TOP_LEFT, units: UNITS_ALL_PIXEL, x: 0, y: 0 },
+      end: { anchor: ANCHOR_TOP_LEFT, units: UNITS_ALL_PIXEL, x: 100, y: 100 }
+    },
+    color: { r: 10, g: 230, b: 10, a: 1.0 },
+    index: 2,
+  },
+  {
+    id: 4, parent: 1, rectangle: {
+      start: { anchor: ANCHOR_TOP_LEFT, units: UNITS_ALL_PIXEL, x: 0, y: 0 },
+      end: { anchor: ANCHOR_TOP_LEFT, units: UNITS_ALL_PIXEL, x: 500, y: 500 }
+    },
+    borderColor: { r: 10, g: 230, b: 200, a: 1.0 },
+    borderWidth: 2.0,
+    index: 1,
+  },
+  {
+    id: 5, parent: 4, rectangle: {
+      start: { anchor: ANCHOR_BOTTOM_LEFT, units: UNITS_ALL_PIXEL, x: 5, y: 5 },
+      end: { anchor: ANCHOR_BOTTOM_RIGHT, units: UNITS_ALL_PIXEL, x: 10, y: 50 }
+    },
+    borderColor: { r: 50, g: 30, b: 200, a: 1.0 },
+    borderWidth: 4.0,
+    index: 0,
+  },
+  {
+    id: 6, parent: 5, rectangle: {
+      start: { anchor: ANCHOR_TOP_LEFT, units: UNITS_ALL_PIXEL, x: 5, y: 5 },
+      end: { anchor: ANCHOR_TOP_LEFT, units: UNITS_ALL_PIXEL, x: 10, y: 50 }
+    },
+    borderColor: { r: 250, g: 30, b: 60, a: 1.0 },
+    borderWidth: 3.0,
+    index: 0,
+  }
+];
+
 function main() {
+  const root = document.getElementById('noka-root');
+  if (!root) {
+    console.error(`Missing an element with 'noka-root' id.`);
+    return;
+  }
+
+  entitiesMap.set(ROOT_ENTITY_ID, {
+    entity: { id: ROOT_ENTITY_ID },
+    elem: root
+  });
+
+  for (const entity of entities) {
+    processEntity(entity);
+  }
 }
 
-main();
+addEventListener('DOMContentLoaded', () => {
+  main();
+});
 
 /**
  * @type Map<EntityId, {entity: Entity, elem: HTMLElement}>
@@ -108,8 +188,17 @@ const entitiesMap = new Map();
  * @param {Entity} entity 
  * @returns {void}
  */
-function processElement(entity) {
+function processEntity(entity) {
   const prev = entitiesMap.get(entity.id);
+
+  if (!prev) {
+    if (!entity.parent) {
+      console.warn(`Entity '${entity.id}' was created without parent.`);
+    }
+    if (entity.index !== undefined) {
+      console.warn(`Entity '${entity.id}' was created without index.`);
+    }
+  }
 
   /** @type {HTMLElement} */
   let elem;
@@ -135,26 +224,32 @@ function processElement(entity) {
       newElem.textContent = entity.text;
     }
 
-    elem = newElem || document.createElement('div');
+    if (newElem) {
+      elem = newElem;
+    } else {
+      elem = document.createElement('div');
+      elem.style.flex = '1';
+    }
     elem.style.position = 'relative';
   }
 
-  if (entity.index && entity.index !== prev?.entity.index) {
-    const parentId = entity.parent || prev?.entity.parent;
-    if (parentId) {
-      const parent = entitiesMap.get(parentId);
-      if (parent) {
-        let numPlaceholderChildren = entity.index - (parent.elem.childElementCount + 1);
-        if (numPlaceholderChildren < 0) {
-          parent.elem.insertBefore(elem, parent.elem.children[entity.index]);
-        } else {
-          while (numPlaceholderChildren > 0) {
-            const placeholder = document.createElement('div');
-            parent.elem.appendChild(placeholder);
-            numPlaceholderChildren--;
+  if (entity.index !== undefined && entity.index !== prev?.entity.index) {
+    const parent = getParent(entity, prev?.entity);
+    if (parent) {
+      let numPlaceholderChildren = entity.index - parent.elem.childElementCount;
+      if (numPlaceholderChildren < 0) {
+        parent.elem.children[entity.index].replaceWith(elem);
+      } else {
+        while (numPlaceholderChildren > 0) {
+          const placeholder = document.createElement('div');
+          if (/** @type {CustomWindow} */(window).NOKA_DEBUG) {
+            placeholder.style.backgroundColor = 'rgb(255, 0, 255)';
+            placeholder.style.flex = '1';
           }
-          parent.elem.appendChild(elem);
+          parent.elem.appendChild(placeholder);
+          numPlaceholderChildren--;
         }
+        parent.elem.appendChild(elem);
       }
     }
   }
@@ -197,30 +292,45 @@ function processElement(entity) {
   }
 
   if (entity.rectangle && entity.rectangle !== prev?.entity.rectangle) {
-    const min = entity.rectangle.min;
-    switch (min.anchor) {
-      case ANCHOR_BOTTOM_LEFT:
-        setRectanglePosition(elem, min, 'bottom', 'left');
-        break;
-      case ANCHOR_BOTTOM_RIGHT:
-        setRectanglePosition(elem, min, 'bottom', 'right');
-        break;
-      case ANCHOR_TOP_LEFT:
-        setRectanglePosition(elem, min, 'top', 'left');
-        break;
-      case ANCHOR_TOP_RIGHT:
-        setRectanglePosition(elem, min, 'top', 'right');
-        break;
-    }
+    // const parentDisplay = elem.parentElement?.style.display;
+    // if (parentDisplay === 'flex' || parentDisplay === 'grid') {
+    //   // Add a dummy container element so that the layoyut can be applied without flexbox limitations.
+    //   const container = document.createElement('div');
+    //   elem.replaceWith(container);
+    //   container.appendChild(elem);
+    //   // elem.style.position = 'absolute';
+    // }
+
+    elem.style.flex = '';
+    const { start, end } = entity.rectangle;
+    const bothBottom = anchorIsBottom(start.anchor) && anchorIsBottom(end.anchor);
+    const bothTop = anchorIsTop(start.anchor) && anchorIsTop(end.anchor);
+    const bothLeft = anchorIsLeft(start.anchor) && anchorIsLeft(end.anchor);
+    const bothRight = anchorIsRight(start.anchor) && anchorIsRight(end.anchor);
+
+    const startYField = anchorIsBottom(start.anchor) ? 'bottom' : 'top';
+    const endYField = bothBottom || bothTop ? 'height' : anchorIsBottom(start.anchor) ? 'top' : 'bottom';
+    const startXField = anchorIsRight(start.anchor) ? 'right' : 'left';
+    const endXField = bothRight || bothLeft ? 'width' : anchorIsRight(start.anchor) ? 'left' : 'right';
+
+    setRectanglePosition(elem, start, startYField, startXField);
+    setRectanglePosition(elem, end, endYField, endXField);
   }
 
 
   if (entity.fontFamily && entity.fontFamily !== prev?.entity.fontFamily) {
     elem.style.fontFamily = entity.fontFamily;
   }
-
   if (entity.fontSize && entity.fontSize !== prev?.entity.fontSize) {
     elem.style.fontSize = entity.fontSize;
+  }
+  if (entity.borderWidth && entity.borderWidth !== prev?.entity.borderWidth) {
+    elem.style.borderWidth = `${entity.borderWidth}px`;
+    elem.style.borderStyle = 'solid';
+  }
+  if (entity.borderColor && entity.borderColor !== prev?.entity.borderColor) {
+    const { r, g, b, a } = entity.borderColor;
+    elem.style.borderColor = `rgb(${r},${g},${b},${a})`;
   }
 
   if (prev) {
@@ -231,29 +341,71 @@ function processElement(entity) {
 }
 
 /**
+ * @param {Anchor} anchor
+ * @returns {boolean}
+ */
+function anchorIsBottom(anchor) {
+  return anchor === ANCHOR_BOTTOM_LEFT || anchor === ANCHOR_BOTTOM_RIGHT;
+}
+
+/**
+ * @param {Anchor} anchor
+ * @returns {boolean}
+ */
+function anchorIsTop(anchor) {
+  return anchor === ANCHOR_TOP_LEFT || anchor === ANCHOR_TOP_RIGHT;
+}
+
+/**
+ * @param {Anchor} anchor
+ * @returns {boolean}
+ */
+function anchorIsRight(anchor) {
+  return anchor === ANCHOR_TOP_RIGHT || anchor === ANCHOR_BOTTOM_RIGHT;
+}
+
+/**
+ * @param {Anchor} anchor
+ * @returns {boolean}
+ */
+function anchorIsLeft(anchor) {
+  return anchor === ANCHOR_BOTTOM_LEFT || anchor === ANCHOR_TOP_LEFT;
+}
+
+/**
+ * @param {Entity} entity
+ * @param {Entity|undefined} prevEntity
+ * @returns {{entity: Entity, elem: HTMLElement}|undefined}
+ */
+function getParent(entity, prevEntity) {
+  const parentId = entity.parent || prevEntity?.parent;
+  return parentId ? entitiesMap.get(parentId) : undefined;
+}
+
+/**
  * @param {HTMLElement} elem
  * @param {Point} point
- * @param {string} yAnchor
- * @param {string} xAnchor
+ * @param {string} yField
+ * @param {string} xField
  * @returns {void}
  */
-function setRectanglePosition(elem, point, yAnchor, xAnchor) {
+function setRectanglePosition(elem, point, yField, xField) {
   switch (point.units) {
     case UNITS_ALL_PERCENTAGE:
-      elem.style[yAnchor] = `${point.y}%`;
-      elem.style[xAnchor] = `${point.x}%`;
+      elem.style[yField] = `${point.y}%`;
+      elem.style[xField] = `${point.x}%`;
       break;
     case UNITS_ALL_PIXEL:
-      elem.style[yAnchor] = `${point.y}px`;
-      elem.style[xAnchor] = `${point.x}px`;
+      elem.style[yField] = `${point.y}px`;
+      elem.style[xField] = `${point.x}px`;
       break;
     case UNITS_X_PERCENTAGE_AND_Y_PIXEL:
-      elem.style[yAnchor] = `${point.y}px`;
-      elem.style[xAnchor] = `${point.x}%`;
+      elem.style[yField] = `${point.y}px`;
+      elem.style[xField] = `${point.x}%`;
       break;
     case UNITS_X_PIXEL_AND_Y_PERCENTAGE:
-      elem.style[yAnchor] = `${point.y}%`;
-      elem.style[xAnchor] = `${point.x}px`;
+      elem.style[yField] = `${point.y}%`;
+      elem.style[xField] = `${point.x}px`;
       break;
   }
 }
