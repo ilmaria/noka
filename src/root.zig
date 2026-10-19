@@ -4,7 +4,6 @@ pub const Entity = enum(u32) {
 };
 
 pub const Value = extern union {
-    parent: Entity,
     index: u64,
     layout: Layout,
     flags: Flags,
